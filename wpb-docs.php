@@ -1,11 +1,9 @@
 <?php
 /**
  * Plugin Name: WPB Docs
- * Description: docs library. 
- * Author on docs.wpbarista.com, 
- * export selected docs to a file, 
- * then import that file into a client site. 
- * Version: 1.0.0
+ * Description: docs library for WPB themes & code
+ * Author: wpbarista.com 
+ * Version: 1.0.3
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -57,14 +55,14 @@ function wpb_register_doc_cpt() {
 				'not_found'     => __( 'No docs found.', 'wpb' ),
 			),
 
-			// Admin only: no front-end URL, archive, or rewrite rules at all.
+			// Admin only
 			'public'              => false,
 			'publicly_queryable'  => false,
 			'exclude_from_search' => true,
 			'has_archive'         => false,
 			'rewrite'             => false,
 			'query_var'           => false,
-			'show_in_rest'        => false, // no REST needed — nothing external reads this anymore
+			'show_in_rest'        => false, 
 
 			'show_ui'             => true,
 			'show_in_menu'        => true,
@@ -109,10 +107,7 @@ function wpb_register_doc_cpt() {
 
 
 /* -------------------------------------------------------------------------
- * 2. Viewing template — a separate, read-only admin page for non-admin
- *    staff. Capability is deliberately distinct from the CPT's own
- *    (remapped) caps above, so it can stay open to Editors/Authors while
- *    actual editing stays admin-only. Filterable per site if needed.
+ * 2. Viewing template
  * ---------------------------------------------------------------------- */
 
 add_action( 'admin_menu', 'wpb_register_docs_view_page' );
@@ -122,7 +117,7 @@ function wpb_register_docs_view_page() {
 		'edit.php?post_type=doc',
 		__( 'View Docs', 'wpb' ),
 		__( 'View Docs', 'wpb' ),
-		apply_filters( 'wpb_docs_view_capability', 'edit_posts' ), // generic core cap — Contributor role and above, unaffected by the CPT's own remapped caps
+		apply_filters( 'wpb_docs_view_capability', 'edit_posts' ), 
 		'wpb-docs-view',
 		'wpb_render_docs_view_page'
 	);
@@ -131,7 +126,7 @@ function wpb_register_docs_view_page() {
 function wpb_render_docs_view_page() {
 
 	if ( ! current_user_can( apply_filters( 'wpb_docs_view_capability', 'edit_posts' ) ) ) {
-		wp_die( esc_html__( 'You do not have permission to view this page.', 'wpb' ) );
+		wp_die( esc_html__( 'Please see your administrator for permissions to view this page.', 'wpb' ) );
 	}
 
 	$docs = get_posts(
@@ -149,7 +144,7 @@ function wpb_render_docs_view_page() {
 	echo '<div class="wrap"><h1>' . esc_html__( 'Docs', 'wpb' ) . '</h1>';
 
 	if ( empty( $docs ) ) {
-		echo '<p>' . esc_html__( 'No docs yet.', 'wpb' ) . '</p></div>';
+		echo '<p>' . esc_html__( 'No documentation yet.', 'wpb' ) . '</p></div>';
 		return;
 	}
 
@@ -197,7 +192,7 @@ function wpb_register_docs_export_page() {
 function wpb_render_docs_export_page() {
 
 	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( esc_html__( 'You do not have permission to view this page.', 'wpb' ) );
+		wp_die( esc_html__( 'Please see your administrator for permissions to view this page.', 'wpb' ) );
 	}
 
 	$docs = get_posts(
@@ -244,7 +239,7 @@ add_action( 'admin_post_wpb_docs_export', 'wpb_handle_docs_export' );
 function wpb_handle_docs_export() {
 
 	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( esc_html__( 'You do not have permission to do this.', 'wpb' ) );
+		wp_die( esc_html__( 'Please see your administrator for permissions to view this page.', 'wpb' ) );
 	}
 	check_admin_referer( 'wpb_docs_export' );
 
@@ -288,9 +283,7 @@ function wpb_handle_docs_export() {
 
 
 /* -------------------------------------------------------------------------
- * 4. Import — admin only. Upload a previously exported file; creates or
- *    updates local docs matched by slug. This is a one-time copy, not a
- *    sync — nothing here reaches back out to wherever the file came from.
+ * 4. Import
  * ---------------------------------------------------------------------- */
 
 add_action( 'admin_menu', 'wpb_register_docs_import_page' );
@@ -309,7 +302,7 @@ function wpb_register_docs_import_page() {
 function wpb_render_docs_import_page() {
 
 	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( esc_html__( 'You do not have permission to view this page.', 'wpb' ) );
+		wp_die( esc_html__( 'Contact your administrator to use this function.', 'wpb' ) );
 	}
 
 	echo '<div class="wrap"><h1>' . esc_html__( 'Import Docs', 'wpb' ) . '</h1>';
@@ -337,7 +330,7 @@ add_action( 'admin_post_wpb_docs_import', 'wpb_handle_docs_import' );
 function wpb_handle_docs_import() {
 
 	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( esc_html__( 'You do not have permission to do this.', 'wpb' ) );
+		wp_die( esc_html__( 'Contact your administrator to use this function.', 'wpb' ) );
 	}
 	check_admin_referer( 'wpb_docs_import' );
 
