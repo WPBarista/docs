@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: WPB Docs
- * Description: docs library for WPB themes & code
+ * Description: docs library for WPB themes & code, install in wp-content/mu-plugins
  * Author: wpbarista.com 
  * Version: 1.0.3
  */
