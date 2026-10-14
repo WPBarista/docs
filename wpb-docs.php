@@ -11,9 +11,12 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+if ( ! is_admin() ) {
+	return;
+}
 
 /* -------------------------------------------------------------------------
- * 1. The 'doc' CPT — admin only, editing locked to Administrators.
+ * 1. The 'doc' CPT
  * ---------------------------------------------------------------------- */
 
 add_action( 'init', 'wpb_register_doc_cpt' );
@@ -23,7 +26,8 @@ function wpb_admin_only_capabilities() {
 		'edit_post'             => 'manage_options',
 		'read_post'              => 'manage_options',
 		'delete_post'            => 'manage_options',
-		'edit_posts'             => 'manage_options', // gates the native "All Docs" / edit screens
+		'edit_posts'             => 'manage_options', 
+		// gates the native "All Docs" / edit screens
 		'edit_others_posts'      => 'manage_options',
 		'publish_posts'          => 'manage_options',
 		'read_private_posts'     => 'manage_options',
@@ -73,7 +77,7 @@ function wpb_register_doc_cpt() {
 			'capabilities'        => wpb_admin_only_capabilities(),
 
 			'hierarchical'        => false,
-			'supports'            => array( 'title', 'editor', 'revisions', 'page-attributes' ),
+			'supports'            => array( 'title', 'editor', 'revisions', 		'page-attributes' ),
 		)
 	);
 
@@ -102,11 +106,6 @@ function wpb_register_doc_cpt() {
 		)
 	);
 }
-
-register_activation_hook( __FILE__, function () {
-	wpb_register_doc_cpt();
-	flush_rewrite_rules();
-} );
 
 
 /* -------------------------------------------------------------------------
