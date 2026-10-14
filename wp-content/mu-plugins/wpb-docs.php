@@ -126,6 +126,12 @@ function wpb_register_docs_view_page() {
 function wpb_render_docs_view_page() {
 $u = wp_get_current_user();
 echo '<pre>' . esc_html( $u->user_login . ' | roles: ' . implode( ', ', $u->roles ) . ' | manage_options: ' . ( current_user_can( 'manage_options' ) ? 'yes' : 'no' ) . ' | multisite: ' . ( is_multisite() ? 'yes' : 'no' ) ) . '</pre>';
+$r = get_role( 'administrator' );
+echo '<pre>' . esc_html(
+	'role has manage_options: ' . ( $r && ! empty( $r->capabilities['manage_options'] ) ? 'yes' : 'no' ) .
+	' | role capability count: ' . ( $r ? count( $r->capabilities ) : 'role missing' ) .
+	' | your effective manage_options: ' . ( ! empty( $u->allcaps['manage_options'] ) ? 'yes' : 'no' )
+) . '</pre>';
 	if ( ! current_user_can( apply_filters( 'wpb_docs_view_capability', 'edit_posts' ) ) ) {
 		wp_die( esc_html__( 'Please see your administrator for permissions to view this page.', 'wpb' ) );
 	}
