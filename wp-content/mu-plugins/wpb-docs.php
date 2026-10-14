@@ -21,11 +21,7 @@ add_action( 'init', 'wpb_register_doc_cpt' );
 
 function wpb_admin_only_capabilities() {
 	return array(
-		'edit_post'             => 'manage_options',
-		'read_post'              => 'manage_options',
-		'delete_post'            => 'manage_options',
-		'edit_posts'             => 'manage_options', 
-		// gates the native "All Docs" / edit screens
+		'edit_posts'             => 'manage_options',
 		'edit_others_posts'      => 'manage_options',
 		'publish_posts'          => 'manage_options',
 		'read_private_posts'     => 'manage_options',
