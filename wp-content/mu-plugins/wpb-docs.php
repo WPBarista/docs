@@ -35,6 +35,11 @@ function wpb_admin_only_capabilities() {
 	);
 }
 
+
+
+
+
+
 function wpb_register_doc_cpt() {
 
 	register_post_type(
@@ -49,6 +54,7 @@ function wpb_register_doc_cpt() {
 				'all_items'     => __( 'All Docs (edit)', 'wpb' ),
 				'search_items'  => __( 'Search Docs', 'wpb' ),
 				'not_found'     => __( 'No docs found.', 'wpb' ),
+				'parent_item_colon'  => __( 'Parent Doc:', 'wpb' ),
 			),
 
 			// Admin only
@@ -70,8 +76,9 @@ function wpb_register_doc_cpt() {
 			'map_meta_cap'        => true,
 			'capabilities'        => wpb_admin_only_capabilities(),
 
-			'hierarchical'        => false,
-			'supports'            => array( 'title', 'editor', 'revisions', 		'page-attributes' ),
+			// Hierarchy: adds the Parent selector (via page-attributes) and nested list screens.
+			'hierarchical'        => true,
+			'supports'            => array( 'title', 'editor', 'revisions', 'page-attributes' ),
 		)
 	);
 
@@ -102,6 +109,33 @@ function wpb_register_doc_cpt() {
 }
 
 
+
+
+function wpb_get_docs_tree() {
+
+	$pages = get_pages(
+		array(
+			'post_type'    => 'doc',
+			'post_status'  => 'publish',
+			'sort_column'  => 'menu_order, post_title',
+			'hierarchical' => true,
+		)
+	);
+
+	$tree = array();
+	foreach ( (array) $pages as $page ) {
+		$tree[] = array(
+			'post'  => $page,
+			'depth' => count( get_post_ancestors( $page ) ),
+		);
+	}
+
+	return $tree;
+}
+
+
+
+
 /* -------------------------------------------------------------------------
  * 2. Viewing template
  * ---------------------------------------------------------------------- */
@@ -120,41 +154,35 @@ function wpb_register_docs_view_page() {
 }
 
 function wpb_render_docs_view_page() {
+
 	if ( ! current_user_can( apply_filters( 'wpb_docs_view_capability', 'edit_posts' ) ) ) {
 		wp_die( esc_html__( 'Please see your administrator for permissions to view this page.', 'wpb' ) );
 	}
 
-	$docs = get_posts(
-		array(
-			'post_type'      => 'doc',
-			'post_status'    => 'publish',
-			'orderby'        => 'menu_order title',
-			'order'          => 'asc',
-			'posts_per_page' => -1,
-		)
-	);
-
+	$tree       = wpb_get_docs_tree();
 	$current_id = isset( $_GET['doc'] ) ? absint( $_GET['doc'] ) : 0;
 
 	echo '<div class="wrap"><h1>' . esc_html__( 'Docs', 'wpb' ) . '</h1>';
 
-	if ( empty( $docs ) ) {
+	if ( empty( $tree ) ) {
 		echo '<p>' . esc_html__( 'No documentation yet.', 'wpb' ) . '</p></div>';
 		return;
 	}
 
 	echo '<div style="display:flex;gap:2rem;margin-top:1rem;">';
 
-	echo '<ul style="min-width:220px;">';
-	foreach ( $docs as $doc ) {
+	echo '<ul style="min-width:240px;list-style:none;margin:0;padding:0;">';
+	foreach ( $tree as $item ) {
+		$doc    = $item['post'];
 		$url    = esc_url( add_query_arg( array( 'doc' => $doc->ID ) ) );
-		$active = ( (int) $doc->ID === $current_id ) ? ' style="font-weight:600;"' : '';
-		echo '<li' . $active . '><a href="' . $url . '">' . esc_html( $doc->post_title ) . '</a></li>';
+		$style  = 'margin:0 0 6px ' . ( (int) $item['depth'] * 16 ) . 'px;';
+		$style .= ( (int) $doc->ID === $current_id ) ? 'font-weight:600;' : '';
+		echo '<li style="' . esc_attr( $style ) . '"><a href="' . $url . '">' . esc_html( $doc->post_title ) . '</a></li>';
 	}
 	echo '</ul>';
 
 	echo '<div style="flex:1;">';
-	$selected = $current_id ? get_post( $current_id ) : $docs[0];
+	$selected = $current_id ? get_post( $current_id ) : $tree[0]['post'];
 	if ( $selected && 'doc' === $selected->post_type ) {
 		echo '<h2>' . esc_html( $selected->post_title ) . '</h2>';
 		echo apply_filters( 'the_content', $selected->post_content ); // phpcs:ignore -- read-only render of trusted admin-authored content
@@ -165,12 +193,13 @@ function wpb_render_docs_view_page() {
 }
 
 
+
 /* -------------------------------------------------------------------------
  * 3. Export — admin only. Pick which docs to bundle; produces a JSON
  *    download. This is the entire curation step: nothing is exported
- *    unless it's checked here.
+ *    unless it's checked here. Parent docs of anything checked are
+ *    included automatically so the hierarchy survives.
  * ---------------------------------------------------------------------- */
-
 add_action( 'admin_menu', 'wpb_register_docs_export_page' );
 
 function wpb_register_docs_export_page() {
@@ -190,19 +219,11 @@ function wpb_render_docs_export_page() {
 		wp_die( esc_html__( 'Please see your administrator for permissions to view this page.', 'wpb' ) );
 	}
 
-	$docs = get_posts(
-		array(
-			'post_type'      => 'doc',
-			'post_status'    => 'publish',
-			'orderby'        => 'menu_order title',
-			'order'          => 'asc',
-			'posts_per_page' => -1,
-		)
-	);
+	$tree = wpb_get_docs_tree();
 
 	echo '<div class="wrap"><h1>' . esc_html__( 'Export Docs', 'wpb' ) . '</h1>';
 
-	if ( empty( $docs ) ) {
+	if ( empty( $tree ) ) {
 		echo '<p>' . esc_html__( 'No docs to export yet.', 'wpb' ) . '</p></div>';
 		return;
 	}
@@ -213,11 +234,14 @@ function wpb_render_docs_export_page() {
 
 	echo '<p><label><input type="checkbox" id="wpb-select-all" /> ' . esc_html__( 'Select all', 'wpb' ) . '</label></p>';
 
-	echo '<ul>';
-	foreach ( $docs as $doc ) {
-		echo '<li><label><input type="checkbox" class="wpb-doc-cb" name="doc_ids[]" value="' . esc_attr( $doc->ID ) . '" /> ' . esc_html( $doc->post_title ) . '</label></li>';
+	echo '<ul style="list-style:none;margin:0;padding:0;">';
+	foreach ( $tree as $item ) {
+		$doc = $item['post'];
+		echo '<li style="margin:0 0 6px ' . ( (int) $item['depth'] * 20 ) . 'px;"><label><input type="checkbox" class="wpb-doc-cb" name="doc_ids[]" value="' . esc_attr( $doc->ID ) . '" /> ' . esc_html( $doc->post_title ) . '</label></li>';
 	}
 	echo '</ul>';
+
+	echo '<p class="description">' . esc_html__( 'Parent docs of anything you select are included automatically.', 'wpb' ) . '</p>';
 
 	echo '<script>
 		document.getElementById("wpb-select-all").addEventListener("change", function () {
@@ -245,12 +269,22 @@ function wpb_handle_docs_export() {
 		exit;
 	}
 
+	// Add the ancestors of every selected doc.
+	$all_ids = array();
+	foreach ( $doc_ids as $id ) {
+		$all_ids[] = $id;
+		foreach ( get_post_ancestors( $id ) as $ancestor_id ) {
+			$all_ids[] = (int) $ancestor_id;
+		}
+	}
+	$all_ids = array_unique( $all_ids );
+
 	$export = array(
 		'generated' => gmdate( 'c' ),
 		'docs'      => array(),
 	);
 
-	foreach ( $doc_ids as $id ) {
+	foreach ( $all_ids as $id ) {
 		$post = get_post( $id );
 		if ( ! $post || 'doc' !== $post->post_type ) {
 			continue;
@@ -261,11 +295,20 @@ function wpb_handle_docs_export() {
 		$export['docs'][] = array(
 			'title'      => $post->post_title,
 			'slug'       => $post->post_name,
+			'path'       => get_page_uri( $post ), // e.g. "setup/child-theme"; identifies the doc and its place in the tree
 			'content'    => $post->post_content,
 			'menu_order' => $post->menu_order,
 			'categories' => is_wp_error( $terms ) ? array() : $terms,
 		);
 	}
+
+	// Parents before children.
+	usort(
+		$export['docs'],
+		function ( $a, $b ) {
+			return substr_count( $a['path'], '/' ) <=> substr_count( $b['path'], '/' );
+		}
+	);
 
 	$filename = 'docs-export-' . gmdate( 'Y-m-d' ) . '.json';
 
@@ -278,7 +321,9 @@ function wpb_handle_docs_export() {
 
 
 /* -------------------------------------------------------------------------
- * 4. Import
+ * 4. Import — matches existing docs by path (parent/child slugs), updates
+ *    them or creates new ones, and rebuilds the parent/child structure.
+ *    Older export files that only have 'slug' still import (as top-level docs).
  * ---------------------------------------------------------------------- */
 
 add_action( 'admin_menu', 'wpb_register_docs_import_page' );
@@ -342,21 +387,56 @@ function wpb_handle_docs_import() {
 		exit;
 	}
 
-	$imported = 0;
-
+	// Normalise each entry's path and drop unusable entries.
+	$docs = array();
 	foreach ( $data['docs'] as $doc ) {
 
 		if ( empty( $doc['title'] ) || ! isset( $doc['content'] ) ) {
 			continue;
 		}
 
-		$slug     = ! empty( $doc['slug'] ) ? sanitize_title( $doc['slug'] ) : sanitize_title( $doc['title'] );
-		$existing = get_page_by_path( $slug, OBJECT, 'doc' );
+		$raw_path = ! empty( $doc['path'] ) ? $doc['path'] : ( ! empty( $doc['slug'] ) ? $doc['slug'] : $doc['title'] );
+		$parts    = array_filter( array_map( 'sanitize_title', explode( '/', $raw_path ) ) );
+
+		if ( empty( $parts ) ) {
+			continue;
+		}
+
+		$doc['_path'] = implode( '/', $parts );
+		$docs[]       = $doc;
+	}
+
+	// Parents must exist before their children.
+	usort(
+		$docs,
+		function ( $a, $b ) {
+			return substr_count( $a['_path'], '/' ) <=> substr_count( $b['_path'], '/' );
+		}
+	);
+
+	$imported = 0;
+
+	foreach ( $docs as $doc ) {
+
+		$path      = $doc['_path'];
+		$last_slash = strrpos( $path, '/' );
+		$slug      = false === $last_slash ? $path : substr( $path, $last_slash + 1 );
+		$parent_id = 0;
+
+		if ( false !== $last_slash ) {
+			$parent = get_page_by_path( substr( $path, 0, $last_slash ), OBJECT, 'doc' );
+			if ( $parent ) {
+				$parent_id = $parent->ID;
+			}
+		}
+
+		$existing = get_page_by_path( $path, OBJECT, 'doc' );
 
 		$post_args = array(
 			'post_type'    => 'doc',
 			'post_title'   => sanitize_text_field( $doc['title'] ),
 			'post_name'    => $slug,
+			'post_parent'  => $parent_id,
 			'post_content' => wp_kses_post( $doc['content'] ),
 			'post_status'  => 'publish',
 			'menu_order'   => isset( $doc['menu_order'] ) ? absint( $doc['menu_order'] ) : 0,
@@ -388,4 +468,4 @@ function wpb_handle_docs_import() {
 		)
 	);
 	exit;
-}
+	}
