@@ -3,14 +3,27 @@
  * Plugin Name: WPB Docs
  * Description: docs library for WPB themes & code, install in wp-content/mu-plugins
  * Author: wpbarista.com 
- * Version: 1.0.3
+ * Version: 1.3.1
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-if ( ! is_admin() ) {
-	return;
+class WPB_Docs_REST_Controller extends WP_REST_Posts_Controller {
+
+	public function get_items_permissions_check( $request ) {
+		return $this->wpb_admin_check();
+	}
+
+	public function get_item_permissions_check( $request ) {
+		return $this->wpb_admin_check();
+	}
+
+	private function wpb_admin_check() {
+		return current_user_can( 'manage_options' )
+			? true
+			: new WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'wpb' ), array( 'status' => rest_authorization_required_code() ) );
+	}
 }
 
 /* -------------------------------------------------------------------------
@@ -64,7 +77,8 @@ function wpb_register_doc_cpt() {
 			'has_archive'         => false,
 			'rewrite'             => false,
 			'query_var'           => false,
-			'show_in_rest'        => false, 
+			'show_in_rest'        => true,
+			'rest_controller_class' => 'WPB_Docs_REST_Controller', 
 
 			'show_ui'             => true,
 			'show_in_menu'        => true,
@@ -81,35 +95,7 @@ function wpb_register_doc_cpt() {
 			'supports'            => array( 'title', 'editor', 'revisions', 'page-attributes' ),
 		)
 	);
-
-	register_taxonomy(
-		'doc_category',
-		'doc',
-		array(
-			'labels'            => array(
-				'name'          => __( 'Doc Categories', 'wpb' ),
-				'singular_name' => __( 'Doc Category', 'wpb' ),
-				'menu_name'     => __( 'Categories', 'wpb' ),
-			),
-			'public'            => false,
-			'hierarchical'      => true,
-			'show_ui'           => true,
-			'show_admin_column' => true,
-			'show_in_rest'      => false,
-			'query_var'         => false,
-			'rewrite'           => false,
-			'capabilities'      => array(
-				'manage_terms' => 'manage_options',
-				'edit_terms'   => 'manage_options',
-				'delete_terms' => 'manage_options',
-				'assign_terms' => 'manage_options',
-			),
-		)
-	);
 }
-
-
-
 
 function wpb_get_docs_tree() {
 
@@ -195,10 +181,7 @@ function wpb_render_docs_view_page() {
 
 
 /* -------------------------------------------------------------------------
- * 3. Export — admin only. Pick which docs to bundle; produces a JSON
- *    download. This is the entire curation step: nothing is exported
- *    unless it's checked here. Parent docs of anything checked are
- *    included automatically so the hierarchy survives.
+ * 3. Export — admin only. 
  * ---------------------------------------------------------------------- */
 add_action( 'admin_menu', 'wpb_register_docs_export_page' );
 
@@ -290,15 +273,13 @@ function wpb_handle_docs_export() {
 			continue;
 		}
 
-		$terms = wp_get_post_terms( $id, 'doc_category', array( 'fields' => 'names' ) );
-
 		$export['docs'][] = array(
 			'title'      => $post->post_title,
 			'slug'       => $post->post_name,
 			'path'       => get_page_uri( $post ), // e.g. "setup/child-theme"; identifies the doc and its place in the tree
 			'content'    => $post->post_content,
 			'menu_order' => $post->menu_order,
-			'categories' => is_wp_error( $terms ) ? array() : $terms,
+		
 		);
 	}
 
@@ -323,7 +304,6 @@ function wpb_handle_docs_export() {
 /* -------------------------------------------------------------------------
  * 4. Import — matches existing docs by path (parent/child slugs), updates
  *    them or creates new ones, and rebuilds the parent/child structure.
- *    Older export files that only have 'slug' still import (as top-level docs).
  * ---------------------------------------------------------------------- */
 
 add_action( 'admin_menu', 'wpb_register_docs_import_page' );
@@ -451,10 +431,6 @@ function wpb_handle_docs_import() {
 
 		if ( is_wp_error( $post_id ) || ! $post_id ) {
 			continue;
-		}
-
-		if ( ! empty( $doc['categories'] ) && is_array( $doc['categories'] ) ) {
-			wp_set_object_terms( $post_id, $doc['categories'], 'doc_category', false );
 		}
 
 		++$imported;
